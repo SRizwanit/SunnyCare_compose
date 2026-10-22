@@ -60,11 +60,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          PKG_REGEX='^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'
+          PKG_REGEX='^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$'
           for NAME in OLD_PKG NEW_PKG; do
             VALUE="${!NAME}"
             if [[ ! "$VALUE" =~ $PKG_REGEX ]]; then
-              echo "::error::$NAME '$VALUE' সঠিক ফরম্যাটে নেই। ছোট হাতের অক্ষর, সংখ্যা, _ এবং . ব্যবহার করুন; প্রতিটি অংশ অক্ষর দিয়ে শুরু হতে হবে (যেমন com.example.app)"
+              echo "::error::$NAME '$VALUE' সঠিক ফরম্যাটে নেই। ইংরেজি অক্ষর (ছোট/বড় হাতের), সংখ্যা, _ এবং . ব্যবহার করুন; প্রতিটি অংশ অক্ষর দিয়ে শুরু হতে হবে এবং অন্তত দুটো অংশ লাগবে (যেমন com.Example.App)"
               exit 1
             fi
           done
