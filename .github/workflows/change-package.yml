@@ -1,0 +1,240 @@
+name: Change Package Name
+
+# এই workflow পুরো প্রজেক্টে পুরনো package name বদলে নতুন package name বসায় এবং
+# পরিবর্তনটা রিপোজিটরিতে স্থায়ীভাবে commit করে দেয়।
+#
+# কী কী হয়:
+#   1. সোর্স ফোল্ডার সরানো      : যেকোনো মডিউলের src/<sourceSet>/{kotlin,java,resources}/old/path -> new/path
+#   2. টেক্সট রিপ্লেসমেন্ট        : প্রজেক্টের সব টেক্সট ফাইলে (এক্সটেনশন নির্দিষ্ট নয়): package/import,
+#                                 namespace, applicationId, string constant, proguard ইত্যাদি
+#   3. যাচাই                      : কোথাও পুরনো নাম বাকি থাকলে commit না করে fail করে
+#   4. commit + push              : বর্তমান branch-এ অথবা নতুন branch-এ
+#
+# যা পরিবর্তন হয় না: লজিক, UI, ডিপেন্ডেন্সি, রিসোর্স, .github/ এর ভেতরের ফাইল।
+# AndroidManifest-এ আপনার প্রজেক্টে ".MainActivity" ধরনের relative নাম এবং
+# ${applicationId}.fileprovider ব্যবহার হয়েছে, তাই manifest আলাদা করে বদলাতে হয় না।
+
+on:
+  workflow_dispatch:
+    inputs:
+      old_package_name:
+        description: 'পুরনো Package Name'
+        required: true
+        default: 'com.konasl.nagad'
+        type: string
+      new_package_name:
+        description: 'নতুন Package Name (যেমন: com.example.sunnycare)'
+        required: true
+        type: string
+      commit_to:
+        description: 'পরিবর্তন কোথায় commit হবে'
+        required: true
+        default: current-branch
+        type: choice
+        options:
+          - current-branch
+          - new-branch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: change-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  change-package:
+    name: Replace package name
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        env:
+          OLD_PKG: ${{ inputs.old_package_name }}
+          NEW_PKG: ${{ inputs.new_package_name }}
+          COMMIT_TO: ${{ inputs.commit_to }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+
+          PKG_REGEX='^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'
+          for NAME in OLD_PKG NEW_PKG; do
+            VALUE="${!NAME}"
+            if [[ ! "$VALUE" =~ $PKG_REGEX ]]; then
+              echo "::error::$NAME '$VALUE' সঠিক ফরম্যাটে নেই। ছোট হাতের অক্ষর, সংখ্যা, _ এবং . ব্যবহার করুন; প্রতিটি অংশ অক্ষর দিয়ে শুরু হতে হবে (যেমন com.example.app)"
+              exit 1
+            fi
+          done
+
+          if [[ "$NEW_PKG" == "$OLD_PKG" || "$NEW_PKG" == "$OLD_PKG".* || "$OLD_PKG" == "$NEW_PKG".* ]]; then
+            echo "::error::OLD ও NEW package name একই হতে পারবে না, এবং একটা আরেকটার ভেতরে (prefix) থাকতে পারবে না।"
+            exit 1
+          fi
+
+          # Java/Kotlin কীওয়ার্ড package-এর অংশ হতে পারে না (যেমন com.app.new)
+          KEYWORDS=" abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for goto if implements import instanceof int interface long native new package private protected public return short static strictfp super switch synchronized this throw throws transient try void volatile while true false null in is as fun val var when object typealias typeof "
+          IFS='.' read -ra PARTS <<< "$NEW_PKG"
+          for P in "${PARTS[@]}"; do
+            if [[ "$KEYWORDS" == *" $P "* ]]; then
+              echo "::error::নতুন package name-এর '$P' অংশটি Java/Kotlin-এর reserved শব্দ, এটা ব্যবহার করা যাবে না।"
+              exit 1
+            fi
+          done
+
+          if [ "$COMMIT_TO" = "current-branch" ] && [ "$REF_TYPE" != "branch" ]; then
+            echo "::error::workflow টি branch থেকে চালান (tag থেকে নয়), অথবা commit_to = new-branch দিন।"
+            exit 1
+          fi
+
+          echo "✅ ইনপুট ঠিক আছে: $OLD_PKG -> $NEW_PKG"
+
+      - name: Replace package name
+        env:
+          OLD_PKG: ${{ inputs.old_package_name }}
+          NEW_PKG: ${{ inputs.new_package_name }}
+        run: |
+          set -euo pipefail
+
+          OLD_PATH="$(printf '%s' "$OLD_PKG" | tr '.' '/')"
+          NEW_PATH="$(printf '%s' "$NEW_PKG" | tr '.' '/')"
+          export OLD_PKG NEW_PKG OLD_PATH NEW_PATH
+
+          # কোনো নির্দিষ্ট ফাইল বা এক্সটেনশন ঠিক করা নেই: প্রজেক্টের সব টেক্সট ফাইলে খোঁজা হয়
+          # (binary ফাইল -I দিয়ে আপনা-আপনি বাদ)। শুধু এই ফোল্ডারগুলো বাদ থাকে:
+          #   .git, .gradle, build, node_modules, .idea  -> জেনারেটেড/ক্যাশ
+          #   .github                                    -> GITHUB_TOKEN দিয়ে workflow ফাইল push করা যায় না
+          EXCLUDES=(--exclude-dir=.git --exclude-dir=.gradle --exclude-dir=build
+                    --exclude-dir=node_modules --exclude-dir=.idea --exclude-dir=.github)
+
+          echo "== ধাপ ১: সোর্স ফোল্ডার সরানো (সব মডিউল, সব source set) =="
+          # যেকোনো মডিউলের src/<sourceSet>/{kotlin,java,resources}/<পুরনো/path> খুঁজে বের করা হয়
+          DIRS="$RUNNER_TEMP/dirs-to-move.list"
+          find . \( -name .git -o -name .gradle -o -name build -o -name node_modules \) -prune -o \
+            -type d \( -path "*/src/*/kotlin/$OLD_PATH" \
+                     -o -path "*/src/*/java/$OLD_PATH" \
+                     -o -path "*/src/*/resources/$OLD_PATH" \) -print0 > "$DIRS"
+
+          MOVED=0
+          while IFS= read -r -d '' OLD_DIR; do
+            SRC_ROOT="${OLD_DIR%/$OLD_PATH}"
+            NEW_DIR="$SRC_ROOT/$NEW_PATH"
+
+            if [ -e "$NEW_DIR" ]; then
+              echo "::error::'$NEW_DIR' আগে থেকেই আছে, তাই মুভ করা গেল না।"
+              exit 1
+            fi
+
+            echo "Moving: $OLD_DIR -> $NEW_DIR"
+            mkdir -p "$(dirname "$NEW_DIR")"
+            mv "$OLD_DIR" "$NEW_DIR"
+            MOVED=$((MOVED + 1))
+
+            # খালি হয়ে যাওয়া পুরনো parent ফোল্ডার মুছে ফেলা
+            P="$(dirname "$OLD_DIR")"
+            while [ "$P" != "$SRC_ROOT" ] && [ -d "$P" ] && [ -z "$(ls -A "$P")" ]; do
+              rmdir "$P"
+              P="$(dirname "$P")"
+            done
+          done < "$DIRS"
+
+          echo "== ধাপ ২: টেক্সট রিপ্লেসমেন্ট (সব ফাইল) =="
+          LIST="$RUNNER_TEMP/files-to-edit.list"
+          grep -rIlFZ -e "$OLD_PKG" -e "$OLD_PATH" "${EXCLUDES[@]}" . > "$LIST" || true
+          COUNT="$(tr -cd '\0' < "$LIST" | wc -c)"
+
+          if [ "$COUNT" -eq 0 ] && [ "$MOVED" -eq 0 ]; then
+            echo "::error::প্রজেক্টের কোথাও '$OLD_PKG' পাওয়া যায়নি। পুরনো package name ঠিক আছে কিনা দেখুন।"
+            exit 1
+          fi
+
+          echo "যেসব ফাইলে রিপ্লেস হচ্ছে ($COUNT টি):"
+          tr '\0' '\n' < "$LIST" | sed 's/^/  - /'
+
+          # \b-এর মতো সীমানা: 'com.konasl.nagadx' বা 'x.com.konasl.nagad' ভুলে ম্যাচ হবে না
+          xargs -0 -r -a "$LIST" perl -pi -e '
+            BEGIN {
+              $o  = quotemeta($ENV{OLD_PKG});  $n  = $ENV{NEW_PKG};
+              $op = quotemeta($ENV{OLD_PATH}); $np = $ENV{NEW_PATH};
+            }
+            s~(?<![\w.])${o}(?!\w)~${n}~g;
+            s~(?<!\w)${op}(?!\w)~${np}~g;
+          '
+
+          echo "== ধাপ ৩: যাচাই =="
+          # রিপ্লেসমেন্টের মতো একই সীমানা-নিয়মে যাচাই: 'com.konasl.nagadx' জাতীয় ভিন্ন নাম "বাকি আছে" ধরা হয় না
+          OLD_PKG_RE="${OLD_PKG//./\\.}"
+          MATCH_RE="(?<![\\w.])${OLD_PKG_RE}(?!\\w)|(?<!\\w)${OLD_PATH}(?!\\w)"
+          REMAINING="$(grep -rIlP "$MATCH_RE" "${EXCLUDES[@]}" . || true)"
+          if [ -n "$REMAINING" ]; then
+            echo "::error::নিচের ফাইলগুলোতে এখনও পুরনো package name রয়ে গেছে:"
+            echo "$REMAINING"
+            exit 1
+          fi
+
+          LEFTOVER_DIRS="$(find . \( -name .git -o -name .gradle -o -name build -o -name node_modules \) -prune -o \
+            -type d -path "*/$OLD_PATH" -print)"
+          if [ -n "$LEFTOVER_DIRS" ]; then
+            echo "::error::পুরনো package-এর ফোল্ডার এখনও আছে:"
+            echo "$LEFTOVER_DIRS"
+            exit 1
+          fi
+
+          echo "--- সব মডিউলের namespace / applicationId ---"
+          grep -rnE 'namespace|applicationId' --include='build.gradle' --include='build.gradle.kts' \
+            "${EXCLUDES[@]}" . || true
+          GRADLE_FILE="$(ls app/build.gradle.kts app/build.gradle 2>/dev/null | head -n1 || true)"
+          if [ -n "$GRADLE_FILE" ]; then
+            for KEY in namespace applicationId; do
+              if ! grep -E "$KEY" "$GRADLE_FILE" | grep -qF "$NEW_PKG"; then
+                echo "::warning::$GRADLE_FILE-এ '$KEY' এখনও '$NEW_PKG' নয়। হাতে দেখে নিন।"
+              fi
+            done
+          fi
+
+          echo "✅ '$OLD_PKG' -> '$NEW_PKG' সফলভাবে রিপ্লেস হয়েছে, কোনো রেফারেন্স বাকি নেই।"
+
+      - name: Commit and push
+        env:
+          OLD_PKG: ${{ inputs.old_package_name }}
+          NEW_PKG: ${{ inputs.new_package_name }}
+          COMMIT_TO: ${{ inputs.commit_to }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::warning::commit করার মতো কোনো পরিবর্তন নেই।"
+            exit 0
+          fi
+
+          TARGET="$REF_NAME"
+          if [ "$COMMIT_TO" = "new-branch" ]; then
+            TARGET="change-package/$(printf '%s' "$NEW_PKG" | tr '.' '-')-$RUN_NUMBER"
+            git checkout -b "$TARGET"
+          fi
+
+          git commit -q -m "Change package name: $OLD_PKG -> $NEW_PKG"
+          git push origin "HEAD:refs/heads/$TARGET"
+
+          {
+            echo "### ✅ Package name বদলানো হয়েছে"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| পুরনো | \`$OLD_PKG\` |"
+            echo "| নতুন | \`$NEW_PKG\` |"
+            echo "| Branch | \`$TARGET\` |"
+            echo ""
+            echo "পরিবর্তনের সারাংশ:"
+            echo '```'
+            git show --stat --oneline --format= HEAD | tail -n 5
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
