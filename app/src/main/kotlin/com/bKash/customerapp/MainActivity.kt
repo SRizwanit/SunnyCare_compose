@@ -1,29 +1,64 @@
-package com.bKash.customerapp
+package com.konasl.nagad
 
 import android.Manifest
-import android.animation.ValueAnimator
-import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.*
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TextView
+import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.core.content.res.ResourcesCompat
-import androidx.core.view.setPadding
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 class MainActivity : AppCompatActivity() {
-
-    private var customTypeface: Typeface? = null
-    private val allTextViews = mutableListOf<TextView>()
 
     // FIX: Android 13 (API 33)+ এ নোটিফিকেশন দেখাতে হলে শুধু ম্যানিফেস্টে
     // POST_NOTIFICATIONS ঘোষণা করলেই যথেষ্ট না — রানটাইমেও ইউজারের কাছ থেকে
@@ -42,189 +77,24 @@ class MainActivity : AppCompatActivity() {
 
         requestNotificationPermissionIfNeeded()
 
-        val gradientDrawable = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Color.parseColor("#0F6C61"), Color.parseColor("#0A4A42"))
-        )
-
-        val root = FrameLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            background = gradientDrawable
-        }
-
-        val centerLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.CENTER }
-            setPadding(dp(28), dp(20), dp(28), dp(20))
-        }
-
-        // ===== App icon (unchanged, as requested) =====
-        val iconView = SunnyCareIconView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(100), dp(100)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-            }
-        }
-
-        val appName = createText("SunnyCare ☀", 30f, Typeface.BOLD, Color.WHITE, Gravity.CENTER).apply {
-            letterSpacing = 0.02f
-        }
-
-        // ===== Doctor details card =====
-        val drName = createText("ডা. মাসুম বিল্লাহ সানি", 19f, Typeface.BOLD, Color.WHITE, Gravity.CENTER)
-
-        val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(46), dp(3)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(8)
-                bottomMargin = dp(2)
-            }
-            background = GradientDrawable().apply {
-                cornerRadius = dp(2).toFloat()
-                setColor(Color.parseColor("#F59E0B"))
-            }
-        }
-
-        val degreesText = createRowText(
-            "এম.বি.বি.এস (সিইউ), ডি.এম.ইউ (আল্ট্রা),\nপিজিটি (পিএমসি), এম.সি.জি.পি (মেডিসিন ও শিশু),\nসি.সি.ডি (ডায়াবেটিস-বারডেম, ঢাকা)",
-            10.5f, Typeface.NORMAL, Color.argb(235, 255, 255, 255)
-        )
-
-        val designationText = createRowText(
-            "প্রাক্তন মেডিকেল অফিসার:\nপার্কভিউ মেডিকেল কলেজ হাসপাতাল, সিলেট",
-            10f, Typeface.NORMAL, Color.argb(195, 255, 255, 255)
-        )
-
-        val specialtiesText = createRowText(
-            "মেডিসিন-শিশু, ডায়াবেটিস, উচ্চ রক্তচাপ, নাক-কান-গলা, বাত ব্যাথা, এলার্জি, শ্বাসকষ্ট, চর্ম ও যৌনরোগে অভিজ্ঞ।",
-            10f, Typeface.NORMAL, Color.argb(205, 255, 255, 255)
-        )
-
-        val chamberText = createRowText(
-            "ঢাকা ডায়গনস্টিক সেন্টার, মাধবপুর পশ্চিম বাজার (সোনালী ব্যাংকের নিচ তলা), কাজী আক্তার ম্যানশন, মাধবপুর, হবিগঞ্জ।",
-            9.5f, Typeface.NORMAL, Color.argb(180, 255, 255, 255)
-        )
-
-        val cardBg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(22).toFloat()
-            setColor(Color.argb(26, 255, 255, 255))
-            setStroke(dp(1), Color.argb(55, 255, 255, 255))
-        }
-
-        val doctorCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cardBg
-            setPadding(dp(18), dp(18), dp(18), dp(16))
-            layoutParams = LinearLayout.LayoutParams(dp(300), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(22)
-            }
-            addView(drName)
-            addView(divider)
-            addView(iconTextRow(VectorIconView.IconType.CAP, degreesText))
-            addView(iconTextRow(VectorIconView.IconType.HOSPITAL, designationText))
-            addView(iconTextRow(VectorIconView.IconType.HEART, specialtiesText))
-            addView(iconTextRow(VectorIconView.IconType.PIN, chamberText))
-        }
-
-        // ===== BMDC verified badge (with shield vector icon) =====
-        val bmdcBg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(50).toFloat()
-            setColor(Color.argb(45, 255, 255, 255))
-        }
-        val bmdcText = createText("বি.এম.ডি.সি নং – এ-১১৭৪৬৩  •  Verified", 10f, Typeface.BOLD, Color.WHITE, Gravity.CENTER)
-        val bmdcRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = bmdcBg
-            setPadding(dp(14), dp(7), dp(16), dp(7))
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(18)
-            }
-            val shieldIcon = VectorIconView(this@MainActivity, VectorIconView.IconType.SHIELD).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(15), dp(15)).apply { rightMargin = dp(8) }
-            }
-            addView(shieldIcon)
-            addView(bmdcText)
-        }
-
-        // ===== Loading dots =====
-        val dotsLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(26) }
-        }
-        val dots = mutableListOf<View>()
-        repeat(3) {
-            val dot = View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(8), dp(8)).apply {
-                    leftMargin = dp(4); rightMargin = dp(4)
-                }
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.WHITE)
-                }
-                alpha = 0.3f
-            }
-            dots.add(dot)
-            dotsLayout.addView(dot)
-        }
-        animateDots(dots)
-
-        val footer = createText(
-            "আপনার সুস্থতাই আমাদের অঙ্গীকার",
-            9.5f, Typeface.NORMAL, Color.argb(120, 255, 255, 255), Gravity.CENTER
-        ).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = dp(22)
-            }
-            setPadding(dp(16), 0, dp(16), 0)
-        }
-
-        centerLayout.apply {
-            addView(iconView)
-            addView(space(dp(16)))
-            addView(appName)
-            addView(doctorCard)
-            addView(bmdcRow)
-            addView(dotsLayout)
-        }
-
-        root.addView(centerLayout)
-        root.addView(footer)
-        setContentView(root)
-
         // === ফন্ট লোডিং লজিক ===
-        // আগে ইন্টারনেট থেকে ফন্ট ডাউনলোড করে internal storage-এ সেভ করে তারপর লোড করা হতো।
-        // এখন ফন্ট ফাইলটা সরাসরি প্রজেক্টের res/font/solaimanlipi.ttf-এ বান্ডেল করা আছে, তাই
-        // কোনো নেটওয়ার্ক কল বা ব্যাকগ্রাউন্ড থ্রেড ছাড়াই ResourcesCompat.getFont() দিয়ে সরাসরি লোড হয়।
+        // ফন্ট ফাইলটা সরাসরি প্রজেক্টের res/font/solaimanlipi.ttf-এ বান্ডেল করা আছে, তাই
+        // কোনো নেটওয়ার্ক কল বা ব্যাকগ্রাউন্ড থ্রেড ছাড়াই লোড হয়।
+        // Compose UI নিজে FontFamily(Font(R.font.solaimanlipi)) ব্যবহার করে (নিচে দেখুন);
+        // আর MyApp-কে জানিয়ে দেওয়া হয় ফন্ট রেডি — বাকি (View-ভিত্তিক) Activity-গুলোর
+        // Auto Font System এর জন্য।
         loadFontAndApply()
+
+        setContent {
+            SplashScreen()
+        }
 
         // Auto navigate
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             if (SupabaseClient.isLoggedIn(this)) {
-                startActivity(android.content.Intent(this, HomeActivity::class.java))
+                startActivity(Intent(this, HomeActivity::class.java))
             } else {
-                startActivity(android.content.Intent(this, LoginActivity::class.java))
+                startActivity(Intent(this, LoginActivity::class.java))
             }
             finish()
         }, 2600)
@@ -251,251 +121,427 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * res/font/solaimanlipi.ttf থেকে সরাসরি টাইপফেস লোড করে — এটা একটা লোকাল রিসোর্স ফাইল
-     * (কোনো ডাউনলোড/নেটওয়ার্ক কল নেই), তাই কোনো ব্যাকগ্রাউন্ড থ্রেডের প্রয়োজন নেই, মূল থ্রেডেই
-     * তাৎক্ষণিকভাবে লোড হয়ে যায়।
+     * MyApp-কে ফন্ট লোড করতে বলে (res/font/solaimanlipi.ttf থেকে, লোকাল রিসোর্স —
+     * কোনো নেটওয়ার্ক কল/ব্যাকগ্রাউন্ড থ্রেড লাগে না)।
      */
     private fun loadFontAndApply() {
         try {
-            customTypeface = ResourcesCompat.getFont(this, R.font.solaimanlipi)
-
             // MyApp কে জানিয়ে দাও ফন্ট রেডি - Auto System এর জন্য
             (application as MyApp).loadFont()
-
-            customTypeface?.let { tf ->
-                allTextViews.forEach { tv ->
-                    if (tv.text.any { c -> c.code in 2432..2559 }) {
-                        val oldStyle = tv.typeface?.style ?: Typeface.NORMAL
-                        tv.typeface = Typeface.create(tf, oldStyle)
-                    }
-                }
-            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
+}
 
-    // ===== Main circular sun/medical-cross logo (kept exactly as before) =====
-    class SunnyCareIconView(context: Context) : View(context) {
-        private val paintWhite = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
-        private val paintOrange = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F59E0B"); style = Paint.Style.FILL; strokeWidth = 6f; strokeCap = Paint.Cap.ROUND }
-        private val paintOrangeStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F59E0B"); style = Paint.Style.STROKE; strokeWidth = 7f; strokeCap = Paint.Cap.ROUND }
+// ─────────────────────────────────────────────────────────────
+// Colors & Font
+// ─────────────────────────────────────────────────────────────
 
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val cx = w / 2
-            val cy = h / 2
-            canvas.drawCircle(cx, cy, w / 2, paintWhite)
-            canvas.drawCircle(cx, cy, w * 0.22f, paintOrange)
-            for (i in 0 until 8) {
-                val angle = Math.toRadians((i * 45).toDouble())
-                val r1 = w * 0.30f
-                val r2 = w * 0.38f
-                val sx = cx + r1 * Math.cos(angle).toFloat()
-                val sy = cy + r1 * Math.sin(angle).toFloat()
-                val ex = cx + r2 * Math.cos(angle).toFloat()
-                val ey = cy + r2 * Math.sin(angle).toFloat()
-                canvas.drawLine(sx, sy, ex, ey, paintOrangeStroke)
-            }
-            val crossW = w * 0.24f
-            val crossH = w * 0.08f
-            canvas.drawRect(cx - crossW / 2, cy - crossH / 2, cx + crossW / 2, cy + crossH / 2, paintWhite)
-            canvas.drawRect(cx - crossH / 2, cy - crossW / 2, cx + crossH / 2, cy + crossW / 2, paintWhite)
+private val GradientTop = Color(0xFF0F6C61)
+private val GradientBottom = Color(0xFF0A4A42)
+private val AccentOrange = Color(0xFFF59E0B)
+private val ShieldCheckColor = Color(0xFF0A4A42)
+
+private val SolaimanLipi = FontFamily(Font(R.font.solaimanlipi))
+
+// আগের কোডের মতোই: বাংলা অক্ষর (Unicode 2432..2559) থাকলে তবেই SolaimanLipi, নইলে সিস্টেম ফন্ট
+private fun hasBangla(text: String): Boolean = text.any { it.code in 2432..2559 }
+
+private fun fontFor(text: String): FontFamily =
+    if (hasBangla(text)) SolaimanLipi else FontFamily.Default
+
+// ValueAnimator এর ডিফল্ট AccelerateDecelerateInterpolator এর হুবহু সমতুল্য
+private val AccelerateDecelerateEasing = Easing { f ->
+    (cos((f + 1) * PI) / 2.0 + 0.5).toFloat()
+}
+
+// ─────────────────────────────────────────────────────────────
+// Splash screen
+// ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun SplashScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(GradientTop, GradientBottom)))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.Center)
+                .padding(horizontal = 28.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // ===== App icon (unchanged, as requested) =====
+            SunnyCareIcon(Modifier.size(100.dp))
+
+            Spacer(Modifier.height(16.dp))
+
+            SplashText(
+                text = "SunnyCare ☀",
+                sizeSp = 30f,
+                bold = true,
+                color = Color.White,
+                letterSpacingEm = 0.02f
+            )
+
+            DoctorCard()
+            BmdcBadge()
+            LoadingDots()
+        }
+
+        SplashText(
+            text = "আপনার সুস্থতাই আমাদের অঙ্গীকার",
+            sizeSp = 9.5f,
+            color = Color(255, 255, 255, 120),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 22.dp)
+        )
+    }
+}
+
+// ===== Doctor details card =====
+@Composable
+private fun DoctorCard() {
+    val shape = RoundedCornerShape(22.dp)
+    Column(
+        modifier = Modifier
+            .padding(top = 22.dp)
+            .width(300.dp)
+            .background(Color(255, 255, 255, 26), shape)
+            .border(1.dp, Color(255, 255, 255, 55), shape)
+            .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SplashText(
+            text = "ডা. মাসুম বিল্লাহ সানি",
+            sizeSp = 19f,
+            bold = true,
+            color = Color.White
+        )
+
+        // সোনালি ডিভাইডার
+        Box(
+            modifier = Modifier
+                .padding(top = 8.dp, bottom = 2.dp)
+                .size(width = 46.dp, height = 3.dp)
+                .background(AccentOrange, RoundedCornerShape(2.dp))
+        )
+
+        IconTextRow(
+            iconType = IconType.CAP,
+            text = "এম.বি.বি.এস (সিইউ), ডি.এম.ইউ (আল্ট্রা),\nপিজিটি (পিএমসি), এম.সি.জি.পি (মেডিসিন ও শিশু),\nসি.সি.ডি (ডায়াবেটিস-বারডেম, ঢাকা)",
+            sizeSp = 10.5f,
+            color = Color(255, 255, 255, 235)
+        )
+
+        IconTextRow(
+            iconType = IconType.HOSPITAL,
+            text = "প্রাক্তন মেডিকেল অফিসার:\nপার্কভিউ মেডিকেল কলেজ হাসপাতাল, সিলেট",
+            sizeSp = 10f,
+            color = Color(255, 255, 255, 195)
+        )
+
+        IconTextRow(
+            iconType = IconType.HEART,
+            text = "মেডিসিন-শিশু, ডায়াবেটিস, উচ্চ রক্তচাপ, নাক-কান-গলা, বাত ব্যাথা, এলার্জি, শ্বাসকষ্ট, চর্ম ও যৌনরোগে অভিজ্ঞ।",
+            sizeSp = 10f,
+            color = Color(255, 255, 255, 205)
+        )
+
+        IconTextRow(
+            iconType = IconType.PIN,
+            text = "ঢাকা ডায়গনস্টিক সেন্টার, মাধবপুর পশ্চিম বাজার (সোনালী ব্যাংকের নিচ তলা), কাজী আক্তার ম্যানশন, মাধবপুর, হবিগঞ্জ।",
+            sizeSp = 9.5f,
+            color = Color(255, 255, 255, 180)
+        )
+    }
+}
+
+// ভেক্টর আইকন + টেক্সট নিয়ে একটি হরাইজন্টাল সারি
+@Composable
+private fun IconTextRow(
+    iconType: IconType,
+    text: String,
+    sizeSp: Float,
+    color: Color,
+    iconSize: Dp = 18.dp
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 9.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        VectorIcon(
+            iconType = iconType,
+            modifier = Modifier
+                .padding(top = 2.dp, end = 9.dp)
+                .size(iconSize)
+        )
+        SplashText(
+            text = text,
+            sizeSp = sizeSp,
+            color = color,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// ===== BMDC verified badge (with shield vector icon) =====
+@Composable
+private fun BmdcBadge() {
+    Row(
+        modifier = Modifier
+            .padding(top = 18.dp)
+            .background(Color(255, 255, 255, 45), RoundedCornerShape(50))
+            .padding(start = 14.dp, top = 7.dp, end = 16.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        VectorIcon(
+            iconType = IconType.SHIELD,
+            modifier = Modifier
+                .padding(end = 8.dp)
+                .size(15.dp)
+        )
+        SplashText(
+            text = "বি.এম.ডি.সি নং – এ-১১৭৪৬৩  •  Verified",
+            sizeSp = 10f,
+            bold = true,
+            color = Color.White
+        )
+    }
+}
+
+// ===== Loading dots =====
+@Composable
+private fun LoadingDots() {
+    val transition = rememberInfiniteTransition(label = "loadingDots")
+    val v by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 700, easing = AccelerateDecelerateEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dotsAlpha"
+    )
+
+    Row(
+        modifier = Modifier.padding(top = 26.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(3) { index ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(8.dp)
+                    .alpha(v * (1f - index * 0.15f))
+                    .background(Color.White, CircleShape)
+            )
         }
     }
+}
 
-    // ===== Small vector icons used inside the doctor details card =====
-    class VectorIconView(context: Context, private val iconType: IconType) : View(context) {
+// ─────────────────────────────────────────────────────────────
+// Text helper (আগের createText / createRowText এর সমতুল্য)
+// ─────────────────────────────────────────────────────────────
 
-        enum class IconType { CAP, HOSPITAL, HEART, PIN, SHIELD }
+@Composable
+private fun SplashText(
+    text: String,
+    sizeSp: Float,
+    color: Color,
+    modifier: Modifier = Modifier,
+    bold: Boolean = false,
+    textAlign: TextAlign = TextAlign.Center,
+    letterSpacingEm: Float? = null
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        color = color,
+        fontSize = sizeSp.sp,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        fontFamily = fontFor(text),
+        textAlign = textAlign,
+        letterSpacing = if (letterSpacingEm != null) letterSpacingEm.em else androidx.compose.ui.unit.TextUnit.Unspecified
+    )
+}
 
-        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.WHITE }
-        private val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.parseColor("#F59E0B") }
-        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = Color.WHITE
-            strokeWidth = 5f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
+// ─────────────────────────────────────────────────────────────
+// Main circular sun/medical-cross logo (kept exactly as before)
+// ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun SunnyCareIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val cx = size.width / 2
+        val cy = size.height / 2
+
+        drawCircle(Color.White, radius = w / 2, center = Offset(cx, cy))
+        drawCircle(AccentOrange, radius = w * 0.22f, center = Offset(cx, cy))
+
+        for (i in 0 until 8) {
+            val angle = Math.toRadians((i * 45).toDouble())
+            val r1 = w * 0.30f
+            val r2 = w * 0.38f
+            val sx = cx + r1 * cos(angle).toFloat()
+            val sy = cy + r1 * sin(angle).toFloat()
+            val ex = cx + r2 * cos(angle).toFloat()
+            val ey = cy + r2 * sin(angle).toFloat()
+            drawLine(
+                color = AccentOrange,
+                start = Offset(sx, sy),
+                end = Offset(ex, ey),
+                strokeWidth = 7f,
+                cap = StrokeCap.Round
+            )
         }
 
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val w = width.toFloat()
-            val h = height.toFloat()
-            if (w <= 0f || h <= 0f) return
-            when (iconType) {
-                IconType.CAP -> drawCap(canvas, w, h)
-                IconType.HOSPITAL -> drawHospital(canvas, w, h)
-                IconType.HEART -> drawHeart(canvas, w, h)
-                IconType.PIN -> drawPin(canvas, w, h)
-                IconType.SHIELD -> drawShield(canvas, w, h)
-            }
-        }
+        val crossW = w * 0.24f
+        val crossH = w * 0.08f
+        drawRect(
+            Color.White,
+            topLeft = Offset(cx - crossW / 2, cy - crossH / 2),
+            size = Size(crossW, crossH)
+        )
+        drawRect(
+            Color.White,
+            topLeft = Offset(cx - crossH / 2, cy - crossW / 2),
+            size = Size(crossH, crossW)
+        )
+    }
+}
 
-        // গ্র্যাজুয়েশন ক্যাপ — শিক্ষাগত যোগ্যতা (ডিগ্রি) বোঝাতে
-        private fun drawCap(canvas: Canvas, w: Float, h: Float) {
-            val path = Path().apply {
-                moveTo(w * 0.5f, h * 0.12f)
-                lineTo(w * 0.95f, h * 0.40f)
-                lineTo(w * 0.5f, h * 0.66f)
-                lineTo(w * 0.05f, h * 0.40f)
-                close()
-            }
-            canvas.drawPath(path, fillPaint)
-            val band = RectF(w * 0.27f, h * 0.54f, w * 0.73f, h * 0.76f)
-            canvas.drawRoundRect(band, w * 0.05f, w * 0.05f, accentPaint)
-            canvas.drawLine(w * 0.87f, h * 0.42f, w * 0.87f, h * 0.82f, strokePaint)
-            canvas.drawCircle(w * 0.87f, h * 0.86f, w * 0.05f, accentPaint)
-        }
+// ─────────────────────────────────────────────────────────────
+// Small vector icons used inside the doctor details card
+// ─────────────────────────────────────────────────────────────
 
-        // হাসপাতাল ভবন + ক্রস — কর্মস্থল/মেডিকেল অফিসার বোঝাতে
-        private fun drawHospital(canvas: Canvas, w: Float, h: Float) {
-            val rect = RectF(w * 0.12f, h * 0.14f, w * 0.88f, h * 0.90f)
-            canvas.drawRoundRect(rect, w * 0.10f, w * 0.10f, fillPaint)
-            val crossW = w * 0.14f
-            val crossH = w * 0.36f
-            val cx = w / 2
-            val cy = h * 0.52f
-            canvas.drawRect(cx - crossW / 2, cy - crossH / 2, cx + crossW / 2, cy + crossH / 2, accentPaint)
-            canvas.drawRect(cx - crossH / 2, cy - crossW / 2, cx + crossH / 2, cy + crossW / 2, accentPaint)
-        }
+private enum class IconType { CAP, HOSPITAL, HEART, PIN, SHIELD }
 
-        // হার্টবিট/পালস লাইন — চিকিৎসার বিভিন্ন বিভাগ (ডিজিজ স্পেশালিটি) বোঝাতে
-        private fun drawHeart(canvas: Canvas, w: Float, h: Float) {
-            val path = Path().apply {
-                moveTo(0f, h * 0.55f)
-                lineTo(w * 0.22f, h * 0.55f)
-                lineTo(w * 0.34f, h * 0.18f)
-                lineTo(w * 0.47f, h * 0.88f)
-                lineTo(w * 0.58f, h * 0.38f)
-                lineTo(w * 0.68f, h * 0.55f)
-                lineTo(w, h * 0.55f)
-            }
-            canvas.drawPath(path, strokePaint)
-            canvas.drawCircle(w * 0.47f, h * 0.88f, w * 0.045f, accentPaint)
-        }
+private val IconStroke = Stroke(width = 5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
-        // ম্যাপ পিন — চেম্বার/ঠিকানা বোঝাতে
-        private fun drawPin(canvas: Canvas, w: Float, h: Float) {
-            val cx = w / 2
-            val topCy = h * 0.34f
-            val r = w * 0.32f
-            canvas.drawCircle(cx, topCy, r, fillPaint)
-            val tri = Path().apply {
-                moveTo(cx - r * 0.78f, topCy + r * 0.55f)
-                lineTo(cx + r * 0.78f, topCy + r * 0.55f)
-                lineTo(cx, h * 0.95f)
-                close()
-            }
-            canvas.drawPath(tri, fillPaint)
-            canvas.drawCircle(cx, topCy, r * 0.42f, accentPaint)
-        }
-
-        // শিল্ড + চেকমার্ক — বি.এম.ডি.সি ভেরিফায়েড বোঝাতে
-        private fun drawShield(canvas: Canvas, w: Float, h: Float) {
-            val path = Path().apply {
-                moveTo(w * 0.5f, h * 0.04f)
-                lineTo(w * 0.92f, h * 0.20f)
-                lineTo(w * 0.92f, h * 0.54f)
-                cubicTo(w * 0.92f, h * 0.80f, w * 0.72f, h * 0.95f, w * 0.5f, h * 0.98f)
-                cubicTo(w * 0.28f, h * 0.95f, w * 0.08f, h * 0.80f, w * 0.08f, h * 0.54f)
-                lineTo(w * 0.08f, h * 0.20f)
-                close()
-            }
-            canvas.drawPath(path, fillPaint)
-            val check = Path().apply {
-                moveTo(w * 0.30f, h * 0.50f)
-                lineTo(w * 0.45f, h * 0.65f)
-                lineTo(w * 0.72f, h * 0.35f)
-            }
-            val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                color = Color.parseColor("#0A4A42")
-                strokeWidth = 5f
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-            }
-            canvas.drawPath(check, checkPaint)
+@Composable
+private fun VectorIcon(iconType: IconType, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return@Canvas
+        when (iconType) {
+            IconType.CAP -> drawCap(w, h)
+            IconType.HOSPITAL -> drawHospital(w, h)
+            IconType.HEART -> drawHeart(w, h)
+            IconType.PIN -> drawPin(w, h)
+            IconType.SHIELD -> drawShield(w, h)
         }
     }
+}
 
-    // কেন্দ্রীয় (centered) টেক্সট তৈরি করে — টাইটেল/নাম/ব্যাজের জন্য
-    private fun createText(text: String, sizeSp: Float, style: Int, color: Int, gravity: Int): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = sizeSp
-            setTypeface(null, style)
-            setTextColor(color)
-            this.gravity = gravity
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { this.gravity = Gravity.CENTER_HORIZONTAL }
-            MyApp.banglaTypeface?.let {
-                if (text.any { c -> c.code in 2432..2559 }) {
-                    typeface = Typeface.create(it, style)
-                }
-            }
-            allTextViews.add(this)
-        }
+// গ্র্যাজুয়েশন ক্যাপ — শিক্ষাগত যোগ্যতা (ডিগ্রি) বোঝাতে
+private fun DrawScope.drawCap(w: Float, h: Float) {
+    val path = Path().apply {
+        moveTo(w * 0.5f, h * 0.12f)
+        lineTo(w * 0.95f, h * 0.40f)
+        lineTo(w * 0.5f, h * 0.66f)
+        lineTo(w * 0.05f, h * 0.40f)
+        close()
     }
+    drawPath(path, Color.White)
+    drawRoundRect(
+        color = AccentOrange,
+        topLeft = Offset(w * 0.27f, h * 0.54f),
+        size = Size(w * 0.73f - w * 0.27f, h * 0.76f - h * 0.54f),
+        cornerRadius = CornerRadius(w * 0.05f, w * 0.05f)
+    )
+    drawLine(
+        color = Color.White,
+        start = Offset(w * 0.87f, h * 0.42f),
+        end = Offset(w * 0.87f, h * 0.82f),
+        strokeWidth = 5f,
+        cap = StrokeCap.Round
+    )
+    drawCircle(AccentOrange, radius = w * 0.05f, center = Offset(w * 0.87f, h * 0.86f))
+}
 
-    // আইকন-রো'র পাশে বসানোর জন্য বাম-সারিবদ্ধ (left aligned), width-flexible টেক্সট
-    private fun createRowText(text: String, sizeSp: Float, style: Int, color: Int): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = sizeSp
-            setTypeface(null, style)
-            setTextColor(color)
-            gravity = Gravity.START
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            MyApp.banglaTypeface?.let {
-                if (text.any { c -> c.code in 2432..2559 }) {
-                    typeface = Typeface.create(it, style)
-                }
-            }
-            allTextViews.add(this)
-        }
+// হাসপাতাল ভবন + ক্রস — কর্মস্থল/মেডিকেল অফিসার বোঝাতে
+private fun DrawScope.drawHospital(w: Float, h: Float) {
+    drawRoundRect(
+        color = Color.White,
+        topLeft = Offset(w * 0.12f, h * 0.14f),
+        size = Size(w * 0.88f - w * 0.12f, h * 0.90f - h * 0.14f),
+        cornerRadius = CornerRadius(w * 0.10f, w * 0.10f)
+    )
+    val crossW = w * 0.14f
+    val crossH = w * 0.36f
+    val cx = w / 2
+    val cy = h * 0.52f
+    drawRect(
+        AccentOrange,
+        topLeft = Offset(cx - crossW / 2, cy - crossH / 2),
+        size = Size(crossW, crossH)
+    )
+    drawRect(
+        AccentOrange,
+        topLeft = Offset(cx - crossH / 2, cy - crossW / 2),
+        size = Size(crossH, crossW)
+    )
+}
+
+// হার্টবিট/পালস লাইন — চিকিৎসার বিভিন্ন বিভাগ (ডিজিজ স্পেশালিটি) বোঝাতে
+private fun DrawScope.drawHeart(w: Float, h: Float) {
+    val path = Path().apply {
+        moveTo(0f, h * 0.55f)
+        lineTo(w * 0.22f, h * 0.55f)
+        lineTo(w * 0.34f, h * 0.18f)
+        lineTo(w * 0.47f, h * 0.88f)
+        lineTo(w * 0.58f, h * 0.38f)
+        lineTo(w * 0.68f, h * 0.55f)
+        lineTo(w, h * 0.55f)
     }
+    drawPath(path, Color.White, style = IconStroke)
+    drawCircle(AccentOrange, radius = w * 0.045f, center = Offset(w * 0.47f, h * 0.88f))
+}
 
-    // ভেক্টর আইকন + টেক্সট নিয়ে একটি হরাইজন্টাল সারি (row) তৈরি করে
-    private fun iconTextRow(iconType: VectorIconView.IconType, textView: TextView, iconSizeDp: Int = 18): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(9) }
-            val icon = VectorIconView(this@MainActivity, iconType).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(iconSizeDp), dp(iconSizeDp)).apply {
-                    rightMargin = dp(9)
-                    topMargin = dp(2)
-                }
-            }
-            addView(icon)
-            addView(textView)
-        }
+// ম্যাপ পিন — চেম্বার/ঠিকানা বোঝাতে
+private fun DrawScope.drawPin(w: Float, h: Float) {
+    val cx = w / 2
+    val topCy = h * 0.34f
+    val r = w * 0.32f
+    drawCircle(Color.White, radius = r, center = Offset(cx, topCy))
+    val tri = Path().apply {
+        moveTo(cx - r * 0.78f, topCy + r * 0.55f)
+        lineTo(cx + r * 0.78f, topCy + r * 0.55f)
+        lineTo(cx, h * 0.95f)
+        close()
     }
+    drawPath(tri, Color.White)
+    drawCircle(AccentOrange, radius = r * 0.42f, center = Offset(cx, topCy))
+}
 
-    private fun space(h: Int): View = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, h) }
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    private fun animateDots(dots: List<View>) {
-        val animator = ValueAnimator.ofFloat(0.3f, 1f).apply {
-            duration = 700
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-            addUpdateListener {
-                val v = it.animatedValue as Float
-                dots.forEachIndexed { index, dot ->
-                    dot.alpha = v * (1f - index * 0.15f)
-                }
-            }
-        }
-        animator.start()
+// শিল্ড + চেকমার্ক — বি.এম.ডি.সি ভেরিফায়েড বোঝাতে
+private fun DrawScope.drawShield(w: Float, h: Float) {
+    val path = Path().apply {
+        moveTo(w * 0.5f, h * 0.04f)
+        lineTo(w * 0.92f, h * 0.20f)
+        lineTo(w * 0.92f, h * 0.54f)
+        cubicTo(w * 0.92f, h * 0.80f, w * 0.72f, h * 0.95f, w * 0.5f, h * 0.98f)
+        cubicTo(w * 0.28f, h * 0.95f, w * 0.08f, h * 0.80f, w * 0.08f, h * 0.54f)
+        lineTo(w * 0.08f, h * 0.20f)
+        close()
     }
+    drawPath(path, Color.White)
+    val check = Path().apply {
+        moveTo(w * 0.30f, h * 0.50f)
+        lineTo(w * 0.45f, h * 0.65f)
+        lineTo(w * 0.72f, h * 0.35f)
+    }
+    drawPath(check, ShieldCheckColor, style = IconStroke)
 }
