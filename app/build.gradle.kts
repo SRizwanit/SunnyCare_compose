@@ -43,6 +43,7 @@ android {
 
     buildFeatures {
         viewBinding = false
+        compose = true
     }
 
     // FIX: Supabase-kt + Ktor + OkHttp + Coroutines together commonly
@@ -127,4 +128,11 @@ dependencies {
     // ─────────────────────────────────────────
 
     implementation("io.ktor:ktor-client-okhttp:2.3.12")
+    val composeBom = platform("androidx.compose:compose-bom:2025.06.01")
+    implementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.10.1")
+    debugImplementation("androidx.compose.ui:ui-tooling")
 }
