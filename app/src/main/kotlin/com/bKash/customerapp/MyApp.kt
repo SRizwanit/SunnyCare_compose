@@ -1,4 +1,4 @@
-package com.konasl.nagad
+package com.bKash.customerapp
 
 import android.app.Activity
 import android.app.Application

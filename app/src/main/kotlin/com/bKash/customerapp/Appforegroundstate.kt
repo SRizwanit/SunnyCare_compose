@@ -1,4 +1,4 @@
-package com.konasl.nagad
+package com.bKash.customerapp
 
 /**
  * অ্যাপ এখন ফোরগ্রাউন্ডে (কোনো একটিভিটি রিজিউমড অবস্থায় দৃশ্যমান) আছে কিনা

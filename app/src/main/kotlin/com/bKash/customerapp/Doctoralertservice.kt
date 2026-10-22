@@ -1,4 +1,4 @@
-package com.konasl.nagad
+package com.bKash.customerapp
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit
 class DoctorAlertService : Service() {
 
     companion object {
-        const val ACTION_DOCTOR_MESSAGE = "com.konasl.nagad.ACTION_DOCTOR_MESSAGE"
+        const val ACTION_DOCTOR_MESSAGE = "com.bKash.customerapp.ACTION_DOCTOR_MESSAGE"
         const val EXTRA_CONVERSATION_ID = "conversation_id"
         const val EXTRA_APPOINTMENT_ID = "appointment_id"
         const val EXTRA_PREVIEW = "preview"

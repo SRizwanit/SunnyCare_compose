@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    namespace = "com.konasl.nagad"
+    namespace = "com.bKash.customerapp"
 
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.konasl.nagad"
+        applicationId = "com.bKash.customerapp"
 
         minSdk = 26
         targetSdk = 35

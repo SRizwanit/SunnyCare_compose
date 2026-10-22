@@ -1,4 +1,4 @@
-package com.konasl.nagad
+package com.bKash.customerapp
 
 import android.app.Dialog
 import android.content.ClipData
